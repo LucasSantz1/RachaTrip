@@ -8,8 +8,10 @@ from trips.ledger import (
     Balance,
     ExpenseInput,
     LedgerError,
+    Transfer,
     compute_balances,
     split_equal,
+    suggest_settlements,
     validate_amount_cents,
 )
 
@@ -159,3 +161,65 @@ def test_balances_rejects_non_int_share(shares):
     with pytest.raises(LedgerError) as e:
         compute_balances([1, 2], [ExpenseInput(1, 1000, shares)])
     assert e.value.code == "share_not_integer"
+
+
+def _bal(net):
+    return Balance(paid=0, consumed=0, net=net)
+
+
+def test_settlements_all_even():
+    assert suggest_settlements({1: _bal(0), 2: _bal(0)}) == []
+
+
+def test_settlements_greedy_largest_debtor_first():
+    balances = {1: _bal(3000), 2: _bal(-1000), 3: _bal(-2000)}
+    assert suggest_settlements(balances) == [Transfer(3, 1, 2000), Transfer(2, 1, 1000)]
+
+
+def test_settlements_tie_break_by_registration_order():
+    balances = {1: _bal(500), 2: _bal(500), 3: _bal(-1000)}
+    assert suggest_settlements(balances) == [Transfer(3, 1, 500), Transfer(3, 2, 500)]
+
+
+def test_settlements_sole_payer_owes_nothing():
+    balances = compute_balances([1], [ExpenseInput(1, 1000, {1: 1000})])
+    assert suggest_settlements(balances) == []
+
+
+def test_settlements_zero_share_participant_not_involved():
+    shares = split_equal(1, [1, 2, 3])
+    balances = compute_balances([1, 2, 3], [ExpenseInput(1, 1, shares)])
+    zero_share = [pid for pid, s in shares.items() if s == 0]
+    assert zero_share
+    result = suggest_settlements(balances)
+    for t in result:
+        assert t.from_id not in zero_share and t.to_id not in zero_share
+
+
+def test_settlements_rejects_non_zero_sum():
+    with pytest.raises(LedgerError) as e:
+        suggest_settlements({1: _bal(100), 2: _bal(-50)})
+    assert e.value.code == "balances_not_zero_sum"
+
+
+def test_settlements_random_invariants():
+    rng = random.Random(20261112)
+    for case in range(1000):
+        ids = rng.sample(range(1, 1000), rng.randint(2, 20))
+        expenses = []
+        for _ in range(rng.randint(0, 30)):
+            amount = rng.randint(1, 10_000_000)
+            subset = rng.sample(ids, rng.randint(1, len(ids)))
+            expenses.append(ExpenseInput(rng.choice(ids), amount, split_equal(amount, subset)))
+        balances = compute_balances(ids, expenses)
+        result = suggest_settlements(balances)
+        ctx = f"case={case} ids={ids} expenses={expenses} result={result}"
+        remaining = {pid: b.net for pid, b in balances.items()}
+        for t in result:
+            remaining[t.from_id] += t.amount_cents
+            remaining[t.to_id] -= t.amount_cents
+        assert all(v == 0 for v in remaining.values()), ctx
+        assert len(result) <= len(ids) - 1, ctx
+        assert all(t.amount_cents > 0 for t in result), ctx
+        assert all(t.from_id != t.to_id for t in result), ctx
+        assert suggest_settlements(balances) == result, ctx

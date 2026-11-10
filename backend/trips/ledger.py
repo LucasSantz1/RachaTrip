@@ -109,3 +109,33 @@ def compute_balances(
         for pid, share in expense.shares.items():
             consumed[pid] += share
     return {pid: Balance(paid[pid], consumed[pid], paid[pid] - consumed[pid]) for pid in paid}
+
+
+class Transfer(NamedTuple):
+    from_id: int
+    to_id: int
+    amount_cents: int
+
+
+def suggest_settlements(balances: Mapping[int, Balance]) -> list[Transfer]:
+    """Sugere transferências que zeram os saldos (algoritmo guloso).
+
+    A ordem das chaves de `balances` é a ordem de cadastro e desempata.
+    A cada passo pelo menos um saldo zera: no máximo n - 1 transferências.
+    """
+    if sum(b.net for b in balances.values()) != 0:
+        raise LedgerError("balances_not_zero_sum", "A soma dos saldos deve ser zero.")
+    pos = {pid: i for i, pid in enumerate(balances)}
+    remaining = {pid: b.net for pid, b in balances.items()}
+    transfers: list[Transfer] = []
+    while True:
+        creditors = [pid for pid, v in remaining.items() if v > 0]
+        if not creditors:
+            return transfers
+        debtors = [pid for pid, v in remaining.items() if v < 0]
+        creditor = max(creditors, key=lambda pid: (remaining[pid], -pos[pid]))
+        debtor = min(debtors, key=lambda pid: (remaining[pid], pos[pid]))
+        amount = min(remaining[creditor], -remaining[debtor])
+        transfers.append(Transfer(debtor, creditor, amount))
+        remaining[creditor] -= amount
+        remaining[debtor] += amount
