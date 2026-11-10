@@ -2,7 +2,7 @@ import datetime
 import hashlib
 
 import pytest
-from django.db import IntegrityError, connection, transaction
+from django.db import DataError, IntegrityError, connection, transaction
 from django.db.models import RestrictedError
 
 from trips.ledger import MAX_AMOUNT_CENTS
@@ -214,7 +214,8 @@ BAD_HASHES = ["x", "a" * 63, "A" * 64, "a" * 63 + "g", "a" * 65]
 @pytest.mark.parametrize("field", ["admin_token_hash", "share_token_hash"])
 @pytest.mark.parametrize("bad", BAD_HASHES)
 def test_malformed_token_hash_rejected(field, bad):
-    with pytest.raises(IntegrityError), transaction.atomic():
+    # 65 caracteres estoura o varchar(64): o MySQL estrito levanta DataError (1406).
+    with pytest.raises((IntegrityError, DataError)), transaction.atomic():
         make_trip(**{field: bad})
 
 
