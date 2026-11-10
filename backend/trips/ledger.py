@@ -90,6 +90,12 @@ def compute_balances(
         for pid, share in expense.shares.items():
             if pid not in known:
                 raise LedgerError("unknown_participant", f"Participante desconhecido: {pid}.")
+            if type(share) is not int:
+                raise LedgerError(
+                    "share_not_integer",
+                    f"A parte do participante {pid} deve ser um inteiro em centavos, "
+                    f"recebido {type(share).__name__}.",
+                )
             if share < 0:
                 raise LedgerError(
                     "share_negative", f"A parte do participante {pid} não pode ser negativa."

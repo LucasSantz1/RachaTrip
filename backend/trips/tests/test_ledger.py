@@ -145,3 +145,17 @@ def test_balances_properties_random():
         assert sum(b.paid for b in result.values()) == total, ctx
         assert sum(b.consumed for b in result.values()) == total, ctx
         assert all(b.net == b.paid - b.consumed for b in result.values()), ctx
+
+
+@pytest.mark.parametrize(
+    "shares",
+    [
+        {1: 500.0, 2: 500.0},
+        {1: True, 2: 999},
+        {1: Decimal("500"), 2: Decimal("500")},
+    ],
+)
+def test_balances_rejects_non_int_share(shares):
+    with pytest.raises(LedgerError) as e:
+        compute_balances([1, 2], [ExpenseInput(1, 1000, shares)])
+    assert e.value.code == "share_not_integer"
