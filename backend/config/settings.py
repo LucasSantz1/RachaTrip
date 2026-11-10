@@ -1,10 +1,20 @@
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 DEBUG = os.environ.get("DJANGO_DEBUG") == "1"
+
+SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
+if not SECRET_KEY.strip():
+    raise ImproperlyConfigured("DJANGO_SECRET_KEY está vazia; defina uma chave secreta.")
+if not DEBUG and (len(SECRET_KEY) < 50 or SECRET_KEY == "troque-isto"):  # noqa: S105
+    raise ImproperlyConfigured(
+        "DJANGO_SECRET_KEY é curta demais ou é a chave de exemplo; "
+        "use ao menos 50 caracteres aleatórios."
+    )
 ALLOWED_HOSTS = [
     host.strip() for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if host.strip()
 ]
