@@ -9,4 +9,5 @@ select = ["E", "F", "I", "B", "UP", "S"]
 "**/tests/**" = ["S101", "S311"]
 
 [tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
 testpaths = ["trips/tests", "tests"]
