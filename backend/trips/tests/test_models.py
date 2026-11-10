@@ -1,4 +1,5 @@
 import datetime
+import hashlib
 
 import pytest
 from django.db import IntegrityError, connection, transaction
@@ -24,14 +25,18 @@ mysql_only = pytest.mark.skipif(
 _counter = iter(range(1, 10_000))
 
 
+def sha(value):
+    return hashlib.sha256(value.encode()).hexdigest()
+
+
 def make_trip(**kwargs):
     n = next(_counter)
     defaults = {
         "name": "Praia",
         "start_date": datetime.date(2026, 1, 10),
         "end_date": datetime.date(2026, 1, 15),
-        "admin_token_hash": f"a{n}".ljust(64, "0"),
-        "share_token_hash": f"s{n}".ljust(64, "0"),
+        "admin_token_hash": sha(f"admin{n}"),
+        "share_token_hash": sha(f"share{n}"),
     }
     defaults.update(kwargs)
     return Trip.objects.create(**defaults)
@@ -122,15 +127,15 @@ def test_participants_ordered_by_id():
 
 
 def test_duplicate_admin_token_hash_rejected():
-    make_trip(admin_token_hash="x" * 64)
+    make_trip(admin_token_hash=sha("dup"))
     with pytest.raises(IntegrityError), transaction.atomic():
-        make_trip(admin_token_hash="x" * 64)
+        make_trip(admin_token_hash=sha("dup"))
 
 
 def test_duplicate_share_token_hash_rejected():
-    make_trip(share_token_hash="y" * 64)
+    make_trip(share_token_hash=sha("dup"))
     with pytest.raises(IntegrityError), transaction.atomic():
-        make_trip(share_token_hash="y" * 64)
+        make_trip(share_token_hash=sha("dup"))
 
 
 def test_duplicate_share_rejected():
@@ -177,3 +182,74 @@ def test_public_id_auto_and_unique():
     a, b = make_trip(), make_trip()
     assert a.public_id is not None
     assert a.public_id != b.public_id
+
+
+def test_empty_trip_name_rejected():
+    with pytest.raises(IntegrityError), transaction.atomic():
+        make_trip(name="")
+
+
+def test_empty_participant_name_rejected():
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Participant.objects.create(trip=make_trip(), name="")
+
+
+def test_empty_expense_description_rejected():
+    trip = make_trip()
+    payer = Participant.objects.create(trip=trip, name="Ana")
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Expense.objects.create(
+            trip=trip,
+            description="",
+            amount_cents=100,
+            category=Category.OUTROS,
+            date=datetime.date(2026, 1, 11),
+            payer=payer,
+        )
+
+
+BAD_HASHES = ["x", "a" * 63, "A" * 64, "a" * 63 + "g", "a" * 65]
+
+
+@pytest.mark.parametrize("field", ["admin_token_hash", "share_token_hash"])
+@pytest.mark.parametrize("bad", BAD_HASHES)
+def test_malformed_token_hash_rejected(field, bad):
+    with pytest.raises(IntegrityError), transaction.atomic():
+        make_trip(**{field: bad})
+
+
+def test_valid_sha256_hash_saved():
+    trip = make_trip(admin_token_hash=sha("ok"), share_token_hash=sha("ok2"))
+    assert trip.pk is not None
+
+
+def test_invalid_category_rejected():
+    trip = make_trip()
+    payer = Participant.objects.create(trip=trip, name="Ana")
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Expense.objects.create(
+            trip=trip,
+            description="x",
+            amount_cents=100,
+            category="invalida",
+            date=datetime.date(2026, 1, 11),
+            payer=payer,
+        )
+
+
+def test_expenses_ordered_newest_first():
+    trip = make_trip()
+    ana = Participant.objects.create(trip=trip, name="Ana")
+    old = make_expense(trip, ana)
+    new = make_expense(trip, ana)
+    assert list(Expense.objects.all()) == [new, old]
+
+
+def test_shares_ordered_by_participant_id():
+    trip = make_trip()
+    ana = Participant.objects.create(trip=trip, name="Ana")
+    beto = Participant.objects.create(trip=trip, name="Beto")
+    expense = make_expense(trip, ana)
+    ExpenseShare.objects.create(expense=expense, participant=beto)
+    ExpenseShare.objects.create(expense=expense, participant=ana)
+    assert [s.participant_id for s in expense.shares.all()] == [ana.id, beto.id]

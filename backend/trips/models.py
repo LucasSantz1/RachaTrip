@@ -1,9 +1,12 @@
 import uuid
 
 from django.db import models
-from django.db.models import F, Q
+from django.db.models import CharField, F, Q
+from django.db.models.functions import Length
 
 from trips.ledger import MAX_AMOUNT_CENTS
+
+CharField.register_lookup(Length)  # habilita Q(campo__length__gte=...) nas constraints
 
 MAX_PARTICIPANTS_PER_TRIP = 50  # validado na API (Marco 2)
 
@@ -33,6 +36,15 @@ class Trip(models.Model):
                 condition=Q(end_date__gte=F("start_date")),
                 name="trip_end_after_start",
             ),
+            models.CheckConstraint(condition=Q(name__length__gte=1), name="trip_name_not_empty"),
+            models.CheckConstraint(
+                condition=Q(admin_token_hash__regex=r"^[0-9a-f]{64}$"),  # noqa: S106 (não é senha)
+                name="trip_admin_token_hash_format",
+            ),
+            models.CheckConstraint(
+                condition=Q(share_token_hash__regex=r"^[0-9a-f]{64}$"),  # noqa: S106 (não é senha)
+                name="trip_share_token_hash_format",
+            ),
         ]
 
     def __str__(self):
@@ -51,6 +63,9 @@ class Participant(models.Model):
                 fields=["trip", "name"],
                 name="participant_unique_name_per_trip",
             ),
+            models.CheckConstraint(
+                condition=Q(name__length__gte=1), name="participant_name_not_empty"
+            ),
         ]
 
     def __str__(self):
@@ -67,7 +82,15 @@ class Expense(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        ordering = ["-date", "-id"]
+        indexes = [models.Index(fields=["trip", "-date", "-id"], name="expense_trip_date_idx")]
         constraints = [
+            models.CheckConstraint(
+                condition=Q(category__in=Category.values), name="expense_category_valid"
+            ),
+            models.CheckConstraint(
+                condition=Q(description__length__gte=1), name="expense_description_not_empty"
+            ),
             models.CheckConstraint(
                 condition=Q(amount_cents__gte=1) & Q(amount_cents__lte=MAX_AMOUNT_CENTS),
                 name="expense_amount_range",
@@ -85,6 +108,9 @@ class ExpenseShare(models.Model):
     )
 
     class Meta:
+        # split_equal distribui os centavos que sobram pela ordem de cadastro;
+        # a ordem das partes precisa ser determinística.
+        ordering = ["participant_id"]
         constraints = [
             models.UniqueConstraint(
                 fields=["expense", "participant"],

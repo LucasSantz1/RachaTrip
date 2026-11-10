@@ -8,6 +8,10 @@ class TripAdmin(admin.ModelAdmin):
     list_display = ("name", "destination", "start_date", "end_date", "created_at")
     readonly_fields = ("public_id", "admin_token_hash", "share_token_hash", "created_at")
 
+    def has_add_permission(self, request):
+        # Viagens são criadas pela API, que gera os hashes dos tokens.
+        return False
+
 
 @admin.register(Participant)
 class ParticipantAdmin(admin.ModelAdmin):
