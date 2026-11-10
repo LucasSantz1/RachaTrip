@@ -57,7 +57,10 @@ DATABASES = {
         "PASSWORD": os.environ.get("MYSQL_PASSWORD", ""),
         "HOST": os.environ.get("MYSQL_HOST", "db"),
         "PORT": os.environ.get("MYSQL_PORT", "3306"),
-        "OPTIONS": {"charset": "utf8mb4"},
+        "OPTIONS": {
+            "charset": "utf8mb4",
+            "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+        },
     }
 }
 
@@ -78,6 +81,7 @@ USE_TZ = True
 STATIC_URL = "static/"
 
 SECURE_REFERRER_POLICY = "no-referrer"
+SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 
 # Nega por padrão; o Marco 2 define as permissões reais.

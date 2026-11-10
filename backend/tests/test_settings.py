@@ -19,6 +19,7 @@ def test_missing_secret_key_fails():
         check=False,
     )
     assert result.returncode != 0
+    assert "DJANGO_SECRET_KEY" in result.stderr.decode()
 
 
 def test_default_api_permission_denies():
