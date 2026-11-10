@@ -49,6 +49,10 @@ def test_short_secret_key_fails_without_debug():
     assert _load_settings(secret_key="a" * 49).returncode != 0
 
 
+def test_padded_short_secret_key_fails_without_debug():
+    assert _load_settings(secret_key="abc" + " " * 60).returncode != 0
+
+
 def test_strong_secret_key_boots_without_debug():
     result = _load_settings(secret_key=secrets.token_urlsafe(45)[:60].ljust(60, "x"))
     assert result.returncode == 0, result.stderr.decode()
