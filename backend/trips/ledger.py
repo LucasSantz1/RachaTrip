@@ -32,7 +32,7 @@ def validate_amount_cents(value: object) -> int:
     if not 1 <= value <= MAX_AMOUNT_CENTS:
         raise LedgerError(
             "amount_out_of_range",
-            f"O valor deve estar entre 1 e {MAX_AMOUNT_CENTS} centavos, recebido {value}.",
+            f"O valor deve estar entre 1 e {MAX_AMOUNT_CENTS} centavos.",
         )
     return value
 

@@ -69,6 +69,7 @@ DATABASES = {
         "PORT": os.environ.get("MYSQL_PORT", "3306"),
         "OPTIONS": {
             "charset": "utf8mb4",
+            "connect_timeout": 5,
             "init_command": (
                 "SET sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,"
                 "NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'"
@@ -101,5 +102,7 @@ X_FRAME_OPTIONS = "DENY"
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_AUTHENTICATION_CLASSES": [],
+    "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
+    "DEFAULT_METADATA_CLASS": None,
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAdminUser"],
 }

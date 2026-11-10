@@ -35,6 +35,9 @@ def test_rejects_out_of_range(value):
     with pytest.raises(LedgerError) as e:
         validate_amount_cents(value)
     assert e.value.code == "amount_out_of_range"
+    assert "recebido" not in str(e.value)
+    if value != 0:
+        assert str(value) not in str(e.value)
 
 
 def test_split_equal_distributes_remainder_in_order():
@@ -68,12 +71,13 @@ def test_split_equal_rejects_zero_total():
 
 
 def test_split_equal_properties_random():
-    rng = random.Random(20261110)
+    seed = 20261110
+    rng = random.Random(seed)
     for _ in range(1000):
         total = rng.randint(1, MAX_AMOUNT_CENTS)
         ids = rng.sample(range(1, 1000), rng.randint(1, 50))
         parts = split_equal(total, ids)
-        ctx = f"total={total} ids={ids}"
+        ctx = f"seed={seed} total={total} ids={ids}"
         assert list(parts) == ids, ctx
         assert sum(parts.values()) == total, ctx
         assert max(parts.values()) - min(parts.values()) <= 1, ctx
@@ -131,7 +135,8 @@ def test_balances_invalid_expense_after_valid_raises():
 
 
 def test_balances_properties_random():
-    rng = random.Random(20261111)
+    seed = 20261111
+    rng = random.Random(seed)
     for case in range(1000):
         ids = rng.sample(range(1, 1000), rng.randint(2, 20))
         expenses = []
@@ -141,7 +146,7 @@ def test_balances_properties_random():
             expenses.append(ExpenseInput(rng.choice(ids), amount, split_equal(amount, subset)))
         total = sum(x.amount_cents for x in expenses)
         result = compute_balances(ids, expenses)
-        ctx = f"case={case} ids={ids} expenses={expenses}"
+        ctx = f"seed={seed} case={case} ids={ids} expenses={expenses}"
         assert list(result) == ids, ctx
         assert sum(b.net for b in result.values()) == 0, ctx
         assert sum(b.paid for b in result.values()) == total, ctx
@@ -181,6 +186,15 @@ def test_settlements_tie_break_by_registration_order():
     assert suggest_settlements(balances) == [Transfer(3, 1, 500), Transfer(3, 2, 500)]
 
 
+def test_settlements_tie_break_debtors_by_registration_order():
+    balances = {
+        1: Balance(0, 500, -500),
+        2: Balance(0, 500, -500),
+        3: Balance(1000, 0, 1000),
+    }
+    assert suggest_settlements(balances) == [Transfer(1, 3, 500), Transfer(2, 3, 500)]
+
+
 def test_settlements_sole_payer_owes_nothing():
     balances = compute_balances([1], [ExpenseInput(1, 1000, {1: 1000})])
     assert suggest_settlements(balances) == []
@@ -203,7 +217,8 @@ def test_settlements_rejects_non_zero_sum():
 
 
 def test_settlements_random_invariants():
-    rng = random.Random(20261112)
+    seed = 20261112
+    rng = random.Random(seed)
     for case in range(1000):
         ids = rng.sample(range(1, 1000), rng.randint(2, 20))
         expenses = []
@@ -213,7 +228,7 @@ def test_settlements_random_invariants():
             expenses.append(ExpenseInput(rng.choice(ids), amount, split_equal(amount, subset)))
         balances = compute_balances(ids, expenses)
         result = suggest_settlements(balances)
-        ctx = f"case={case} ids={ids} expenses={expenses} result={result}"
+        ctx = f"seed={seed} case={case} ids={ids} expenses={expenses} result={result}"
         remaining = {pid: b.net for pid, b in balances.items()}
         for t in result:
             remaining[t.from_id] += t.amount_cents

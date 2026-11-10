@@ -30,6 +30,12 @@ def test_health_db_interface_error(client, monkeypatch):
     assert response.json() == {"status": "unavailable"}
 
 
+def test_options_exposes_no_metadata(client):
+    response = client.options("/api/health/")
+    assert "parses" not in response.content.decode()
+    assert "renders" not in response.content.decode()
+
+
 @pytest.mark.django_db
 def test_health_security_headers(client):
     response = client.get("/api/health/")

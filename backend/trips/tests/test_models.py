@@ -1,5 +1,6 @@
 import datetime
 import hashlib
+import secrets
 
 import pytest
 from django.db import DataError, IntegrityError, connection, transaction
@@ -154,10 +155,14 @@ def test_delete_trip_cascades():
     expense = make_expense(trip, ana)
     ExpenseShare.objects.create(expense=expense, participant=ana)
     ExpenseShare.objects.create(expense=expense, participant=beto)
+    other = make_trip()
+    carla = Participant.objects.create(trip=other, name="Carla")
+    other_expense = make_expense(other, carla)
+    ExpenseShare.objects.create(expense=other_expense, participant=carla)
     trip.delete()
-    assert not Participant.objects.exists()
-    assert not Expense.objects.exists()
-    assert not ExpenseShare.objects.exists()
+    assert list(Participant.objects.all()) == [carla]
+    assert list(Expense.objects.all()) == [other_expense]
+    assert ExpenseShare.objects.count() == 1
 
 
 def test_delete_payer_restricted():
@@ -217,6 +222,13 @@ def test_malformed_token_hash_rejected(field, bad):
     # 65 caracteres estoura o varchar(64): o MySQL estrito levanta DataError (1406).
     with pytest.raises((IntegrityError, DataError)), transaction.atomic():
         make_trip(**{field: bad})
+
+
+@pytest.mark.parametrize("field", ["admin_token_hash", "share_token_hash"])
+def test_raw_token_never_storable(field):
+    # Um token cru (token_urlsafe) nunca pode virar hash armazenado.
+    with pytest.raises((IntegrityError, DataError)), transaction.atomic():
+        make_trip(**{field: secrets.token_urlsafe(32)})
 
 
 def test_valid_sha256_hash_saved():
