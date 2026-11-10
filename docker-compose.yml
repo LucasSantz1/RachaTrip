@@ -15,14 +15,14 @@ services:
   api:
     build: ./backend
     environment:
-      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
-      DJANGO_DEBUG: ${DJANGO_DEBUG}
-      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      MYSQL_HOST: ${MYSQL_HOST}
-      MYSQL_PORT: ${MYSQL_PORT}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?defina DJANGO_SECRET_KEY no .env}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-0}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:?defina DJANGO_ALLOWED_HOSTS no .env}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?defina MYSQL_DATABASE no .env}
+      MYSQL_USER: ${MYSQL_USER:?defina MYSQL_USER no .env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?defina MYSQL_PASSWORD no .env}
+      MYSQL_HOST: ${MYSQL_HOST:?defina MYSQL_HOST no .env}
+      MYSQL_PORT: ${MYSQL_PORT:?defina MYSQL_PORT no .env}
     depends_on:
       db:
         condition: service_healthy
@@ -39,6 +39,19 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  web:
+    build: ./frontend
+    environment:
+      API_INTERNAL_URL: ${API_INTERNAL_URL:?defina API_INTERNAL_URL no .env}
+    depends_on:
+      api:
+        condition: service_healthy
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "127.0.0.1:3000:3000"
 
 volumes:
   db_data:
