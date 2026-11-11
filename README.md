@@ -26,7 +26,7 @@ App web mobile-first para dividir as despesas de uma viagem em grupo: cada pesso
 2. Suba os serviços, aplique as migrações e, se quiser, crie um superusuário:
 
    ```bash
-   docker compose up --build
+   docker compose up -d --build --wait
    docker compose exec api python manage.py migrate
    docker compose exec api python manage.py createsuperuser
    ```
@@ -57,6 +57,13 @@ cd backend
 python -m venv .venv
 .venv/Scripts/pip install pytest
 .venv/Scripts/python -m pytest -p no:django trips/tests/test_ledger.py
+```
+
+Simular uma viagem à mão (usa só o ledger, sem Docker; edite as despesas no arquivo):
+
+```bash
+cd backend
+.venv/Scripts/python simular_viagem.py
 ```
 
 Frontend:
